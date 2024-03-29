@@ -1097,6 +1097,7 @@ impl ConnectionType {
 pub enum EnumSource {
     Enum(Arc<Enum>),
     FilterIs,
+    TableColumns(Arc<Table>),
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
@@ -1410,22 +1411,40 @@ impl ___Type for MutationType {
                         table: Arc::clone(table),
                         schema: Arc::clone(&self.schema),
                     }),
-                    args: vec![__InputValue {
-                        name_: "objects".to_string(),
-                        type_: __Type::NonNull(NonNullType {
-                            type_: Box::new(__Type::List(ListType {
-                                type_: Box::new(__Type::NonNull(NonNullType {
-                                    type_: Box::new(__Type::InsertInput(InsertInputType {
-                                        table: Arc::clone(table),
-                                        schema: Arc::clone(&self.schema),
+                    args: vec![
+                        __InputValue {
+                            name_: "objects".to_string(),
+                            type_: __Type::NonNull(NonNullType {
+                                type_: Box::new(__Type::List(ListType {
+                                    type_: Box::new(__Type::NonNull(NonNullType {
+                                        type_: Box::new(__Type::InsertInput(InsertInputType {
+                                            table: Arc::clone(table),
+                                            schema: Arc::clone(&self.schema),
+                                        })),
                                     })),
                                 })),
-                            })),
-                        }),
-                        description: None,
-                        default_value: None,
-                        sql_type: None,
-                    }],
+                            }),
+                            description: None,
+                            default_value: None,
+                            sql_type: None,
+                        },
+                        __InputValue {
+                            name_: "update".to_string(),
+                            type_: __Type::NonNull(NonNullType {
+                                type_: Box::new(__Type::List(ListType {
+                                    type_: Box::new(__Type::NonNull(NonNullType {
+                                        type_: Box::new(__Type::InsertInput(InsertInputType {
+                                            table: Arc::clone(table),
+                                            schema: Arc::clone(&self.schema),
+                                        })),
+                                    })),
+                                })),
+                            }),
+                            description: None,
+                            default_value: None,
+                            sql_type: None,
+                        },
+                    ],
                     description: Some(format!(
                         "Adds one or more `{}` records to the collection",
                         table_base_type_name
@@ -1613,6 +1632,10 @@ impl ___Type for EnumType {
                 )
             }
             EnumSource::FilterIs => Some("FilterIs".to_string()),
+            EnumSource::TableColumns(table) => Some(format!(
+                "{}Field",
+                self.schema.graphql_table_base_type_name(&table)
+            )),
         }
     }
 
@@ -1651,6 +1674,15 @@ impl ___Type for EnumType {
                     },
                 ]
             }
+            EnumSource::TableColumns(table) => table
+                .columns
+                .iter()
+                .map(|col| __EnumValue {
+                    name: self.schema.graphql_column_field_name(col),
+                    description: None,
+                    deprecation_reason: None,
+                })
+                .collect(),
         })
     }
 }
@@ -4014,6 +4046,11 @@ impl __Schema {
                 }));
                 types_.push(__Type::InsertResponse(InsertResponseType {
                     table: Arc::clone(table),
+                    schema: Arc::clone(&schema_rc),
+                }));
+                // Used by on conflict
+                types_.push(__Type::Enum(EnumType {
+                    enum_: EnumSource::TableColumns(Arc::clone(table)),
                     schema: Arc::clone(&schema_rc),
                 }));
             }
